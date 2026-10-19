@@ -27,11 +27,13 @@
     .progress { font-size: 0.85rem; color: #666; margin-bottom: 0.5rem; }
     #user-input { width: 100%; padding: 0.8rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 8px; margin: 0.5rem 0; display: none; }
     #send-btn { display: none; width: 100%; padding: 0.8rem; background: #4A90D9; color: white; border: none; border-radius: 8px; margin-top: 0.3rem; }
+    .user-badge { font-size: 0.9rem; color: #4A90D9; text-align: center; margin-bottom: 1rem; }
   </style>
 </head>
 <body>
   <div id="app">
     <div id="home" class="screen active">
+      <div id="user-badge" class="user-badge"></div>
       <h1>Companion for This Moment</h1>
       <button id="start-btn" class="big-btn">I need to calm down</button>
       <div class="mode-select">
@@ -39,6 +41,7 @@
         <label><input type="radio" name="mode" value="voice"> Voice</label>
       </div>
       <button id="memory-btn" class="link-btn">What helped me</button>
+      <button id="change-user" class="link-btn">Change name</button>
       <p class="disclaimer">Personal support tool. Not therapy or an emergency service.</p>
       <button id="crisis-btn" class="crisis-btn">Emergency Help</button>
     </div>
@@ -72,13 +75,39 @@
   <script>
     let currentScreen = 'home';
     let currentState = 'opening';
-    let memory = JSON.parse(localStorage.getItem('anxietyMemory') || '[]');
+    let memory = [];
     let lastHelpful = null;
     let voiceMode = false;
     let step = 0;
     let userThought = '';
+    let userId = localStorage.getItem('companionUserId') || '';
+    let userName = localStorage.getItem('companionUserName') || '';
 
     const CRISIS_KEYWORDS = ['suicide', 'kill myself', 'end my life', 'want to die', 'hurt myself', 'self-harm'];
+
+    function ensureUser() {
+      if (!userId) {
+        userId = 'user_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        localStorage.setItem('companionUserId', userId);
+      }
+      if (!userName) {
+        const name = prompt('What name should I use for you? (This stays only on this device)');
+        userName = (name && name.trim()) || 'Friend';
+        localStorage.setItem('companionUserName', userName);
+      }
+      document.getElementById('user-badge').textContent = 'Hello, ' + userName;
+      loadMemory();
+    }
+
+    function loadMemory() {
+      const key = 'anxietyMemory_' + userId;
+      memory = JSON.parse(localStorage.getItem(key) || '[]');
+    }
+
+    function saveMemoryStore() {
+      const key = 'anxietyMemory_' + userId;
+      localStorage.setItem(key, JSON.stringify(memory));
+    }
 
     function checkCrisis(text) {
       if (!text) return false;
@@ -117,12 +146,20 @@
     document.getElementById('clear-memory').onclick = () => {
       if (confirm('Delete all saved memory?')) {
         memory = [];
-        localStorage.setItem('anxietyMemory', JSON.stringify(memory));
+        saveMemoryStore();
         renderMemory();
       }
     };
     document.getElementById('stop-btn').onclick = () => endSession();
     document.getElementById('send-btn').onclick = handleUserInput;
+    document.getElementById('change-user').onclick = () => {
+      const name = prompt('New name?', userName);
+      if (name && name.trim()) {
+        userName = name.trim();
+        localStorage.setItem('companionUserName', userName);
+        document.getElementById('user-badge').textContent = 'Hello, ' + userName;
+      }
+    };
 
     function speak(text) {
       if (!voiceMode || !window.speechSynthesis) return;
@@ -138,10 +175,10 @@
 
     function getPersonalizedOpening() {
       if (memory.length === 0) {
-        return 'I am here with you. We can work with your senses, your breath, or a difficult thought. What feels most useful right now?';
+        return `Hello ${userName}. I am here with you. We can work with your senses, your breath, or a difficult thought. What feels most useful right now?`;
       }
       const last = memory[memory.length - 1];
-      return `Last time, "${last}" helped. We can do something similar, or try a different approach. What do you need right now?`;
+      return `Hello ${userName}. Last time, "${last}" helped. We can do something similar, or try a different approach. What do you need right now?`;
     }
 
     const groundingSteps = [
@@ -339,7 +376,7 @@
     function saveMemory(item) {
       if (!memory.includes(item)) {
         memory.push(item);
-        localStorage.setItem('anxietyMemory', JSON.stringify(memory));
+        saveMemoryStore();
       }
       showScreen('home');
     }
@@ -375,10 +412,11 @@
 
     function deleteItem(index) {
       memory.splice(index, 1);
-      localStorage.setItem('anxietyMemory', JSON.stringify(memory));
+      saveMemoryStore();
       renderMemory();
     }
 
+    ensureUser();
     showScreen('home');
   </script>
 </body>
