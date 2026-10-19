@@ -70,6 +70,7 @@
     let currentState = 'opening';
     let memory = JSON.parse(localStorage.getItem('anxietyMemory') || '[]');
     let lastHelpful = null;
+    let voiceMode = false;
 
     const CRISIS_KEYWORDS = ['suicide', 'kill myself', 'end my life', 'want to die', 'hurt myself', 'self-harm'];
 
@@ -84,6 +85,10 @@
       document.getElementById(name).classList.add('active');
       currentScreen = name;
     }
+
+    document.querySelectorAll('input[name="mode"]').forEach(r => {
+      r.onchange = () => { voiceMode = r.value === 'voice'; };
+    });
 
     document.getElementById('start-btn').onclick = () => {
       showScreen('session');
@@ -107,28 +112,30 @@
       }
     };
 
-    document.getElementById('stop-btn').onclick = () => {
-      endSession();
-    };
+    document.getElementById('stop-btn').onclick = () => endSession();
 
-    async function callAI(state, userMessage = '') {
-      if (checkCrisis(userMessage)) {
-        showScreen('crisis');
-        return 'Crisis detected. Please seek help.';
-      }
-      const offline = {
-        opening: 'I am here to help you through this moment. You can talk, write, or choose an exercise.',
-        grounding: 'Notice what you see right now. Pick one thing and describe it to yourself.',
-        breathing: 'Breathe slowly, at a pace that feels comfortable. No need to hold your breath.',
-        short_talk: 'Briefly tell me what is happening right now.'
+    function speak(text) {
+      if (!voiceMode || !window.speechSynthesis) return;
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 0.9;
+      speechSynthesis.speak(u);
+    }
+
+    async function callAI(state) {
+      const responses = {
+        opening: 'I am here with you right now. Take a breath. You can choose to focus on what is around you, slow your breathing, or just tell me what is happening.',
+        grounding: 'Look around you. Name one thing you can see. Then one thing you can hear. Then one thing you can touch. Take your time.',
+        breathing: 'Breathe in slowly through your nose... and out through your mouth. You do not need to hold it. Just let the breath be natural and a little slower than usual.',
+        short_talk: 'What is happening for you in this moment? You can say as much or as little as you want.'
       };
-      return offline[state] || 'I am here with you.';
+      return responses[state] || 'I am here with you.';
     }
 
     async function startSession() {
       currentState = 'opening';
       const reply = await callAI('opening');
       showMessage(reply);
+      speak(reply);
       showButtons([
         { text: 'Focus on surroundings', action: () => goToState('grounding') },
         { text: 'Calm breathing', action: () => goToState('breathing') },
@@ -140,6 +147,7 @@
       currentState = state;
       const reply = await callAI(state);
       showMessage(reply);
+      speak(reply);
 
       if (state === 'grounding' || state === 'breathing') {
         showButtons([
@@ -156,7 +164,9 @@
 
     function endSession() {
       lastHelpful = currentState;
-      showMessage('What was helpful?');
+      const msg = 'Was anything helpful?';
+      showMessage(msg);
+      speak(msg);
       showButtons([
         { text: 'Yes, save it', action: () => saveMemory(lastHelpful || 'An exercise helped') },
         { text: 'No thanks', action: () => showScreen('home') }
