@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Companion for This Moment</title>
+  <meta name="theme-color" content="#4A90D9">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f7fa; color: #333; direction: ltr; text-align: left; }
+    #app { max-width: 480px; margin: 0 auto; min-height: 100vh; background: white; padding: 20px; }
+    .screen { display: none; }
+    .screen.active { display: block; }
+    h1 { font-size: 1.8rem; margin-bottom: 2rem; text-align: center; color: #2c3e50; }
+    .big-btn { display: block; width: 100%; padding: 1.5rem; font-size: 1.4rem; background: #4A90D9; color: white; border: none; border-radius: 12px; margin: 1rem 0; cursor: pointer; }
+    .big-btn:active { background: #357ABD; }
+    .mode-select { display: flex; justify-content: center; gap: 2rem; margin: 1rem 0; }
+    .link-btn { background: none; border: none; color: #4A90D9; font-size: 1rem; margin: 1rem auto; display: block; cursor: pointer; }
+    .disclaimer { font-size: 0.8rem; color: #888; text-align: center; margin-top: 2rem; }
+    .crisis-btn { background: #e74c3c; color: white; border: none; padding: 0.6rem 1rem; border-radius: 8px; position: fixed; bottom: 20px; right: 20px; cursor: pointer; }
+    .message { font-size: 1.2rem; line-height: 1.6; margin: 2rem 0; min-height: 4rem; }
+    .buttons { display: flex; flex-direction: column; gap: 0.8rem; }
+    .buttons button { padding: 1rem; font-size: 1.1rem; border: 1px solid #4A90D9; background: white; border-radius: 8px; cursor: pointer; }
+    .stop-btn { margin-top: 2rem; background: #eee; border: none; padding: 0.8rem; width: 100%; border-radius: 8px; }
+    #memory-list { list-style: none; margin: 1rem 0; }
+    #memory-list li { padding: 0.8rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+    .danger-btn { background: #e74c3c; color: white; border: none; padding: 0.8rem; width: 100%; border-radius: 8px; margin-top: 1rem; }
+    .big { font-size: 1.5rem; font-weight: bold; margin: 0.5rem 0; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="home" class="screen active">
+      <h1>Companion for This Moment</h1>
+      <button id="start-btn" class="big-btn">I need to calm down</button>
+      <div class="mode-select">
+        <label><input type="radio" name="mode" value="text" checked> Text</label>
+        <label><input type="radio" name="mode" value="voice"> Voice</label>
+      </div>
+      <button id="memory-btn" class="link-btn">What helped me</button>
+      <p class="disclaimer">Personal support tool. Not therapy or an emergency service.</p>
+      <button id="crisis-btn" class="crisis-btn">Emergency Help</button>
+    </div>
+
+    <div id="session" class="screen">
+      <div id="message" class="message"></div>
+      <div id="buttons" class="buttons"></div>
+      <button id="stop-btn" class="stop-btn">Stop</button>
+      <button id="crisis-btn-session" class="crisis-btn">Emergency Help</button>
+    </div>
+
+    <div id="memory" class="screen">
+      <h2>What Helped Me</h2>
+      <ul id="memory-list"></ul>
+      <button id="back-home" class="link-btn">Back Home</button>
+      <button id="clear-memory" class="danger-btn">Delete All</button>
+    </div>
+
+    <div id="crisis" class="screen">
+      <h2>Emergency Help</h2>
+      <p>If you are in immediate danger, call now:</p>
+      <p class="big">Emergency: 911 (or local equivalent)</p>
+      <p class="big">Crisis Line: 988 (US) or local</p>
+      <button id="back-from-crisis" class="link-btn">Back</button>
+    </div>
+  </div>
+
+  <script>
+    let currentScreen = 'home';
+    let currentState = 'opening';
+    let memory = JSON.parse(localStorage.getItem('anxietyMemory') || '[]');
+    let lastHelpful = null;
+
+    const CRISIS_KEYWORDS = ['suicide', 'kill myself', 'end my life', 'want to die', 'hurt myself', 'self-harm'];
+
+    function checkCrisis(text) {
+      if (!text) return false;
+      const lower = text.toLowerCase();
+      return CRISIS_KEYWORDS.some(k => lower.includes(k));
+    }
+
+    function showScreen(name) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(name).classList.add('active');
+      currentScreen = name;
+    }
+
+    document.getElementById('start-btn').onclick = () => {
+      showScreen('session');
+      startSession();
+    };
+
+    document.getElementById('memory-btn').onclick = () => {
+      renderMemory();
+      showScreen('memory');
+    };
+
+    document.getElementById('crisis-btn').onclick = () => showScreen('crisis');
+    document.getElementById('crisis-btn-session').onclick = () => showScreen('crisis');
+    document.getElementById('back-from-crisis').onclick = () => showScreen(currentScreen === 'session' ? 'session' : 'home');
+    document.getElementById('back-home').onclick = () => showScreen('home');
+    document.getElementById('clear-memory').onclick = () => {
+      if (confirm('Delete all saved memory?')) {
+        memory = [];
+        localStorage.setItem('anxietyMemory', JSON.stringify(memory));
+        renderMemory();
+      }
+    };
+
+    document.getElementById('stop-btn').onclick = () => {
+      endSession();
+    };
+
+    async function callAI(state, userMessage = '') {
+      if (checkCrisis(userMessage)) {
+        showScreen('crisis');
+        return 'Crisis detected. Please seek help.';
+      }
+      const offline = {
+        opening: 'I am here to help you through this moment. You can talk, write, or choose an exercise.',
+        grounding: 'Notice what you see right now. Pick one thing and describe it to yourself.',
+        breathing: 'Breathe slowly, at a pace that feels comfortable. No need to hold your breath.',
+        short_talk: 'Briefly tell me what is happening right now.'
+      };
+      return offline[state] || 'I am here with you.';
+    }
+
+    async function startSession() {
+      currentState = 'opening';
+      const reply = await callAI('opening');
+      showMessage(reply);
+      showButtons([
+        { text: 'Focus on surroundings', action: () => goToState('grounding') },
+        { text: 'Calm breathing', action: () => goToState('breathing') },
+        { text: 'Tell me what is happening', action: () => goToState('short_talk') }
+      ]);
+    }
+
+    async function goToState(state) {
+      currentState = state;
+      const reply = await callAI(state);
+      showMessage(reply);
+
+      if (state === 'grounding' || state === 'breathing') {
+        showButtons([
+          { text: 'Continue', action: () => goToState(state) },
+          { text: 'Something else', action: () => startSession() },
+          { text: 'Stop', action: () => endSession() }
+        ]);
+      } else if (state === 'short_talk') {
+        showButtons([
+          { text: 'Done', action: () => endSession() }
+        ]);
+      }
+    }
+
+    function endSession() {
+      lastHelpful = currentState;
+      showMessage('What was helpful?');
+      showButtons([
+        { text: 'Yes, save it', action: () => saveMemory(lastHelpful || 'An exercise helped') },
+        { text: 'No thanks', action: () => showScreen('home') }
+      ]);
+    }
+
+    function saveMemory(item) {
+      if (!memory.includes(item)) {
+        memory.push(item);
+        localStorage.setItem('anxietyMemory', JSON.stringify(memory));
+      }
+      showScreen('home');
+    }
+
+    function showMessage(text) {
+      document.getElementById('message').textContent = text;
+    }
+
+    function showButtons(btns) {
+      const container = document.getElementById('buttons');
+      container.innerHTML = '';
+      btns.forEach(b => {
+        const btn = document.createElement('button');
+        btn.textContent = b.text;
+        btn.onclick = b.action;
+        container.appendChild(btn);
+      });
+    }
+
+    function renderMemory() {
+      const list = document.getElementById('memory-list');
+      list.innerHTML = '';
+      if (memory.length === 0) {
+        list.innerHTML = '<li>No saved items yet</li>';
+        return;
+      }
+      memory.forEach((item, i) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span>${item}</span> <button onclick="deleteItem(${i})">Delete</button>`;
+        list.appendChild(li);
+      });
+    }
+
+    function deleteItem(index) {
+      memory.splice(index, 1);
+      localStorage.setItem('anxietyMemory', JSON.stringify(memory));
+      renderMemory();
+    }
+
+    showScreen('home');
+  </script>
+</body>
+</html>
