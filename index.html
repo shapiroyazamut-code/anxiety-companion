@@ -7,25 +7,24 @@
   <meta name="theme-color" content="#4A90D9">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f7fa; color: #333; direction: ltr; text-align: left; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f7fa; color: #333; }
     #app { max-width: 480px; margin: 0 auto; min-height: 100vh; background: white; padding: 20px; }
     .screen { display: none; }
     .screen.active { display: block; }
-    h1 { font-size: 1.8rem; margin-bottom: 2rem; text-align: center; color: #2c3e50; }
-    .big-btn { display: block; width: 100%; padding: 1.5rem; font-size: 1.4rem; background: #4A90D9; color: white; border: none; border-radius: 12px; margin: 1rem 0; cursor: pointer; }
-    .big-btn:active { background: #357ABD; }
+    h1 { font-size: 1.8rem; margin-bottom: 1.5rem; text-align: center; color: #2c3e50; }
+    .big-btn { display: block; width: 100%; padding: 1.4rem; font-size: 1.3rem; background: #4A90D9; color: white; border: none; border-radius: 12px; margin: 1rem 0; cursor: pointer; }
     .mode-select { display: flex; justify-content: center; gap: 2rem; margin: 1rem 0; }
     .link-btn { background: none; border: none; color: #4A90D9; font-size: 1rem; margin: 1rem auto; display: block; cursor: pointer; }
-    .disclaimer { font-size: 0.8rem; color: #888; text-align: center; margin-top: 2rem; }
+    .disclaimer { font-size: 0.75rem; color: #888; text-align: center; margin-top: 1.5rem; }
     .crisis-btn { background: #e74c3c; color: white; border: none; padding: 0.6rem 1rem; border-radius: 8px; position: fixed; bottom: 20px; right: 20px; cursor: pointer; }
-    .message { font-size: 1.2rem; line-height: 1.6; margin: 2rem 0; min-height: 4rem; }
-    .buttons { display: flex; flex-direction: column; gap: 0.8rem; }
-    .buttons button { padding: 1rem; font-size: 1.1rem; border: 1px solid #4A90D9; background: white; border-radius: 8px; cursor: pointer; }
-    .stop-btn { margin-top: 2rem; background: #eee; border: none; padding: 0.8rem; width: 100%; border-radius: 8px; }
+    .message { font-size: 1.15rem; line-height: 1.6; margin: 1.5rem 0; min-height: 5rem; }
+    .buttons { display: flex; flex-direction: column; gap: 0.7rem; }
+    .buttons button { padding: 1rem; font-size: 1.05rem; border: 1px solid #4A90D9; background: white; border-radius: 8px; cursor: pointer; }
+    .stop-btn { margin-top: 1.5rem; background: #eee; border: none; padding: 0.8rem; width: 100%; border-radius: 8px; }
     #memory-list { list-style: none; margin: 1rem 0; }
-    #memory-list li { padding: 0.8rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+    #memory-list li { padding: 0.8rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
     .danger-btn { background: #e74c3c; color: white; border: none; padding: 0.8rem; width: 100%; border-radius: 8px; margin-top: 1rem; }
-    .big { font-size: 1.5rem; font-weight: bold; margin: 0.5rem 0; }
+    .progress { font-size: 0.85rem; color: #666; margin-bottom: 0.5rem; }
   </style>
 </head>
 <body>
@@ -43,6 +42,7 @@
     </div>
 
     <div id="session" class="screen">
+      <div id="progress" class="progress"></div>
       <div id="message" class="message"></div>
       <div id="buttons" class="buttons"></div>
       <button id="stop-btn" class="stop-btn">Stop</button>
@@ -59,8 +59,8 @@
     <div id="crisis" class="screen">
       <h2>Emergency Help</h2>
       <p>If you are in immediate danger, call now:</p>
-      <p class="big">Emergency: 911 (or local equivalent)</p>
-      <p class="big">Crisis Line: 988 (US) or local</p>
+      <p style="font-size:1.4rem;font-weight:bold;margin:0.6rem 0;">Emergency: 911 (or local)</p>
+      <p style="font-size:1.4rem;font-weight:bold;margin:0.6rem 0;">Crisis Line: 988 (US) or local</p>
       <button id="back-from-crisis" class="link-btn">Back</button>
     </div>
   </div>
@@ -71,13 +71,13 @@
     let memory = JSON.parse(localStorage.getItem('anxietyMemory') || '[]');
     let lastHelpful = null;
     let voiceMode = false;
+    let step = 0;
 
     const CRISIS_KEYWORDS = ['suicide', 'kill myself', 'end my life', 'want to die', 'hurt myself', 'self-harm'];
 
     function checkCrisis(text) {
       if (!text) return false;
-      const lower = text.toLowerCase();
-      return CRISIS_KEYWORDS.some(k => lower.includes(k));
+      return CRISIS_KEYWORDS.some(k => text.toLowerCase().includes(k));
     }
 
     function showScreen(name) {
@@ -90,16 +90,8 @@
       r.onchange = () => { voiceMode = r.value === 'voice'; };
     });
 
-    document.getElementById('start-btn').onclick = () => {
-      showScreen('session');
-      startSession();
-    };
-
-    document.getElementById('memory-btn').onclick = () => {
-      renderMemory();
-      showScreen('memory');
-    };
-
+    document.getElementById('start-btn').onclick = () => { showScreen('session'); startSession(); };
+    document.getElementById('memory-btn').onclick = () => { renderMemory(); showScreen('memory'); };
     document.getElementById('crisis-btn').onclick = () => showScreen('crisis');
     document.getElementById('crisis-btn-session').onclick = () => showScreen('crisis');
     document.getElementById('back-from-crisis').onclick = () => showScreen(currentScreen === 'session' ? 'session' : 'home');
@@ -111,66 +103,187 @@
         renderMemory();
       }
     };
-
     document.getElementById('stop-btn').onclick = () => endSession();
 
     function speak(text) {
       if (!voiceMode || !window.speechSynthesis) return;
       const u = new SpeechSynthesisUtterance(text);
       u.rate = 0.9;
+      speechSynthesis.cancel();
       speechSynthesis.speak(u);
     }
 
-    async function callAI(state) {
-      const responses = {
-        opening: 'I am here with you right now. Take a breath. You can choose to focus on what is around you, slow your breathing, or just tell me what is happening.',
-        grounding: 'Look around you. Name one thing you can see. Then one thing you can hear. Then one thing you can touch. Take your time.',
-        breathing: 'Breathe in slowly through your nose... and out through your mouth. You do not need to hold it. Just let the breath be natural and a little slower than usual.',
-        short_talk: 'What is happening for you in this moment? You can say as much or as little as you want.'
-      };
-      return responses[state] || 'I am here with you.';
+    function setProgress(text) {
+      document.getElementById('progress').textContent = text || '';
     }
+
+    function getPersonalizedOpening() {
+      if (memory.length === 0) {
+        return 'I am here with you. We can work with your senses, your breath, or a difficult thought. What feels most useful right now?';
+      }
+      const last = memory[memory.length - 1];
+      return `Last time, "${last}" helped. We can do something similar, or try a different approach. What do you need right now?`;
+    }
+
+    const groundingSteps = [
+      { prompt: 'Name 5 things you can see around you right now.', progress: 'Grounding 1/5' },
+      { prompt: 'Name 4 things you can touch or feel.', progress: 'Grounding 2/5' },
+      { prompt: 'Name 3 things you can hear.', progress: 'Grounding 3/5' },
+      { prompt: 'Name 2 things you can smell.', progress: 'Grounding 4/5' },
+      { prompt: 'Name 1 thing you can taste.', progress: 'Grounding 5/5' }
+    ];
+
+    const breathingCycles = [
+      { prompt: 'Breathe in slowly through your nose for about 4 seconds.', progress: 'Breathing 1/3' },
+      { prompt: 'Gently hold the breath for 2–4 seconds if comfortable.', progress: 'Breathing 2/3' },
+      { prompt: 'Breathe out slowly through your mouth for about 6 seconds.', progress: 'Breathing 3/3' }
+    ];
 
     async function startSession() {
       currentState = 'opening';
-      const reply = await callAI('opening');
+      step = 0;
+      setProgress('');
+      const reply = getPersonalizedOpening();
       showMessage(reply);
       speak(reply);
       showButtons([
-        { text: 'Focus on surroundings', action: () => goToState('grounding') },
-        { text: 'Calm breathing', action: () => goToState('breathing') },
-        { text: 'Tell me what is happening', action: () => goToState('short_talk') }
+        { text: 'Grounding (5-4-3-2-1)', action: () => startGrounding() },
+        { text: 'Calm breathing', action: () => startBreathing() },
+        { text: 'Work with a thought (CBT)', action: () => startCBT() },
+        { text: 'Just talk', action: () => goToState('short_talk') }
       ]);
     }
 
-    async function goToState(state) {
-      currentState = state;
-      const reply = await callAI(state);
-      showMessage(reply);
-      speak(reply);
+    function startGrounding() {
+      currentState = 'grounding';
+      step = 0;
+      nextGrounding();
+    }
 
-      if (state === 'grounding' || state === 'breathing') {
+    function nextGrounding() {
+      if (step >= groundingSteps.length) {
+        const done = 'You finished the grounding. Notice if anything feels even slightly different.';
+        showMessage(done);
+        speak(done);
+        setProgress('Grounding complete');
         showButtons([
-          { text: 'Continue', action: () => goToState(state) },
+          { text: 'Repeat grounding', action: () => startGrounding() },
+          { text: 'Try something else', action: () => startSession() },
+          { text: 'Stop', action: () => endSession() }
+        ]);
+        return;
+      }
+      const s = groundingSteps[step];
+      setProgress(s.progress);
+      showMessage(s.prompt);
+      speak(s.prompt);
+      showButtons([
+        { text: 'Next', action: () => { step++; nextGrounding(); } },
+        { text: 'Something else', action: () => startSession() },
+        { text: 'Stop', action: () => endSession() }
+      ]);
+    }
+
+    function startBreathing() {
+      currentState = 'breathing';
+      step = 0;
+      nextBreathing();
+    }
+
+    function nextBreathing() {
+      if (step >= breathingCycles.length) {
+        const done = 'One full cycle completed. You can do another or switch.';
+        showMessage(done);
+        speak(done);
+        setProgress('Breathing cycle done');
+        showButtons([
+          { text: 'Another cycle', action: () => startBreathing() },
           { text: 'Something else', action: () => startSession() },
           { text: 'Stop', action: () => endSession() }
         ]);
-      } else if (state === 'short_talk') {
-        showButtons([
-          { text: 'Done', action: () => endSession() }
-        ]);
+        return;
       }
+      const s = breathingCycles[step];
+      setProgress(s.progress);
+      showMessage(s.prompt);
+      speak(s.prompt);
+      showButtons([
+        { text: 'Next', action: () => { step++; nextBreathing(); } },
+        { text: 'Something else', action: () => startSession() },
+        { text: 'Stop', action: () => endSession() }
+      ]);
+    }
+
+    function startCBT() {
+      currentState = 'cbt_identify';
+      step = 0;
+      setProgress('Thought work 1/3');
+      const msg = 'What is one difficult thought that is present right now? You can say it in your own words.';
+      showMessage(msg);
+      speak(msg);
+      showButtons([
+        { text: 'I have one', action: () => cbtChallenge() },
+        { text: 'Skip this', action: () => startSession() }
+      ]);
+    }
+
+    function cbtChallenge() {
+      currentState = 'cbt_challenge';
+      setProgress('Thought work 2/3');
+      const msg = 'Is this thought 100% true, or is there another way to see it? What evidence supports or contradicts it?';
+      showMessage(msg);
+      speak(msg);
+      showButtons([
+        { text: 'Next', action: () => cbtReframe() },
+        { text: 'Something else', action: () => startSession() }
+      ]);
+    }
+
+    function cbtReframe() {
+      currentState = 'cbt_reframe';
+      setProgress('Thought work 3/3');
+      const msg = 'Can you find a more balanced or helpful way to phrase this thought?';
+      showMessage(msg);
+      speak(msg);
+      showButtons([
+        { text: 'Done', action: () => endSession() },
+        { text: 'Try again', action: () => startCBT() }
+      ]);
+    }
+
+    function goToState(state) {
+      currentState = state;
+      setProgress('');
+      const msg = 'What is happening for you right now? Share as much or as little as you want.';
+      showMessage(msg);
+      speak(msg);
+      showButtons([
+        { text: 'Done', action: () => endSession() }
+      ]);
     }
 
     function endSession() {
       lastHelpful = currentState;
-      const msg = 'Was anything helpful?';
+      setProgress('');
+      const msg = 'Was anything helpful in this moment?';
       showMessage(msg);
       speak(msg);
       showButtons([
-        { text: 'Yes, save it', action: () => saveMemory(lastHelpful || 'An exercise helped') },
+        { text: 'Yes, save it', action: () => saveMemory(describeHelpful()) },
         { text: 'No thanks', action: () => showScreen('home') }
       ]);
+    }
+
+    function describeHelpful() {
+      const map = {
+        grounding: 'Grounding (5-4-3-2-1)',
+        breathing: 'Calm breathing',
+        cbt_identify: 'Working with a thought',
+        cbt_challenge: 'Working with a thought',
+        cbt_reframe: 'Working with a thought',
+        short_talk: 'Talking it through'
+      };
+      return map[currentState] || 'An exercise helped';
     }
 
     function saveMemory(item) {
